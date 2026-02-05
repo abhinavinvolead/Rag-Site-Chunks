@@ -2,11 +2,20 @@
 
 # main.py
 from fastapi import FastAPI
+from pathlib import Path
+
+# Load environment variables from backend/.env when present (optional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=Path(__file__).parent / ".env")
+except Exception:
+    # dotenv not installed or .env missing — fall back to existing env
+    pass
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from core.config import AppConfig
 from core.logging import get_logger
-from api.routes import chat, documents, settings
+from api.routes import chat, documents, settings, llm
 
 # Initialize
 app = FastAPI(
@@ -36,6 +45,7 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(settings.router)
+app.include_router(llm.router)
 
 
 @app.get("/api/health")
