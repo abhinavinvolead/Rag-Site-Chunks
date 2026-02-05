@@ -11,7 +11,9 @@ import PDFViewer from '@/components/pdf/PDFViewer'
 import { useChatStore } from '@/store/chatStore'
 
 export default function ChatInterface() {
-  const [showSidebar, setShowSidebar] = useState(false)
+  // Sidebar visibility controlled by global store so mode toggles can open/close it
+  const isSidebarOpen = useChatStore(state => state.isSidebarOpen)
+  const toggleSidebar = useChatStore(state => state.toggleSidebar)
   const [showSettings, setShowSettings] = useState(false)
   
   const selectedCitation = useChatStore(state => state.selectedCitation)
@@ -20,12 +22,12 @@ export default function ChatInterface() {
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
       {/* Sidebar */}
-      <Sidebar isOpen={showSidebar} onClose={() => setShowSidebar(false)} />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => toggleSidebar()} />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header onMenuClick={() => setShowSidebar(true)} />
+        <Header onMenuClick={() => toggleSidebar()} />
 
         {/* Chat Area with PDF Viewer */}
         <div className="flex-1 flex overflow-hidden relative">

@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Send, Loader2, Settings2 } from 'lucide-react'
 import { useChatStore } from '@/store/chatStore'
-import { streamChat } from '@/lib/api'
+import { streamChat, streamLLM } from '@/lib/api'
 import { toast } from 'react-hot-toast'
 
 interface InputAreaProps {
@@ -17,6 +17,8 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
   const { addMessage, updateLastMessage, setIsLoading, isLoading, settings } = useChatStore()
+  const mode = useChatStore(state => state.mode)
+  const setMode = useChatStore(state => state.setMode)
 
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return
@@ -43,10 +45,13 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
     addMessage(assistantMessage)
 
     try {
-      const cleanup = streamChat(
+      // Choose streaming endpoint based on mode
+      const streamFn = mode === 'rag' ? streamChat : streamLLM
+      const cleanup = streamFn(
         {
           query: userMessage.content,
-          llm_model: settings?.llm_model,
+          // GROQ mode must always use the fixed Llama model regardless of available models
+          llm_model: mode === 'groq' ? 'llama-3.3-70b-versatile' : settings?.llm_model,
           temperature: settings?.temperature,
           top_k: settings?.top_k,
           stream: true,
@@ -56,7 +61,7 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
             updateLastMessage(token)
           },
           onCitations: (citations) => {
-            // Update citations in the last message
+            // Only RAG path sends citations; update if present
             const messages = useChatStore.getState().messages
             const lastMessage = messages[messages.length - 1]
             if (lastMessage) {
@@ -79,7 +84,6 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
         }
       )
 
-      // Store cleanup function if needed
       return cleanup
     } catch (error: any) {
       setIsLoading(false)
@@ -107,7 +111,7 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask anything about your documents..."
+                placeholder={mode === 'rag' ? "Ask about your documents (RAG enabled)..." : "Ask anything (Groq LLM)..."}
                 className="min-h-[56px] max-h-[200px] pr-12 resize-none 
                           shadow-sm hover:shadow-md focus:shadow-lg
                           transition-shadow duration-200"
@@ -122,6 +126,23 @@ export default function InputArea({ onSettingsClick }: InputAreaProps) {
 
             {/* Action Buttons */}
             <div className="flex gap-2">
+              {/* Mode toggle: Groq (LLM) / RAG */}
+              <div className="flex items-center gap-2">
+                <button
+                  className={`px-3 py-2 rounded-md text-sm ${mode === 'groq' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+                  onClick={() => setMode('groq')}
+                  disabled={isLoading}
+                >
+                  Groq
+                </button>
+                <button
+                  className={`px-3 py-2 rounded-md text-sm ${mode === 'rag' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+                  onClick={() => setMode('rag')}
+                  disabled={isLoading}
+                >
+                  RAG
+                </button>
+              </div>
               {/* Settings Button */}
               <Button
                 variant="outline"

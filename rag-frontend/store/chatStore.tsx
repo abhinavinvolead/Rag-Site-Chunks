@@ -17,6 +17,8 @@ interface ChatStore {
   setSettings: (settings: Settings) => void
   
   // Models
+  // full list as returned by the backend
+  allAvailableModels: ModelInfo[]
   availableModels: ModelInfo[]
   availableEmbeddings: EmbeddingModelInfo[]
   setAvailableModels: (models: ModelInfo[], embeddings: EmbeddingModelInfo[]) => void
@@ -27,6 +29,10 @@ interface ChatStore {
   
   isSidebarOpen: boolean
   toggleSidebar: () => void
+  
+  // Mode: 'groq' (LLM) | 'rag' (retrieval-augmented)
+  mode: 'groq' | 'rag'
+  setMode: (m: 'groq' | 'rag') => void
   
   selectedCitation: any | null
   setSelectedCitation: (citation: any) => void
@@ -60,21 +66,52 @@ export const useChatStore = create<ChatStore>((set) => ({
   setSettings: (settings) => set({ settings }),
   
   // Models
+  allAvailableModels: [],
   availableModels: [],
   availableEmbeddings: [],
-  setAvailableModels: (models, embeddings) => set({ 
-    availableModels: models,
-    availableEmbeddings: embeddings 
+  setAvailableModels: (models, embeddings) => set((state) => {
+    // Apply current mode filter immediately when setting models
+    const filtered = state.mode === 'groq'
+      ? models.filter(m => (m.provider || '').toLowerCase() === 'groq')
+      : models.filter(m => (m.provider || '').toLowerCase() !== 'groq')
+
+    return {
+      allAvailableModels: models,
+      availableModels: filtered,
+      availableEmbeddings: embeddings,
+    }
   }),
   
   // UI State
   isLoading: false,
   setIsLoading: (loading) => set({ isLoading: loading }),
   
-  isSidebarOpen: true,
+  isSidebarOpen: false,
   toggleSidebar: () => set((state) => ({ 
     isSidebarOpen: !state.isSidebarOpen 
   })),
+
+  mode: 'groq',
+  setMode: (m) => set((state) => {
+    // Update available models according to the selected mode
+    const all = state.allAvailableModels || []
+    const filtered = m === 'groq'
+      ? all.filter(x => (x.provider || '').toLowerCase() === 'groq')
+      : all.filter(x => (x.provider || '').toLowerCase() !== 'groq')
+
+    // pick a default model id for the mode
+    // GROQ always uses the fixed Llama model id; RAG picks the first available non-groq model
+    const defaultModelId = m === 'groq'
+      ? 'llama-3.3-70b-versatile'
+      : (filtered.length > 0 ? filtered[0].id : (state.settings?.llm_model || ''))
+
+    return {
+      mode: m,
+      isSidebarOpen: m === 'rag' ? true : false,
+      availableModels: filtered,
+      settings: state.settings ? { ...state.settings, llm_model: defaultModelId } : state.settings,
+    }
+  }),
   
   selectedCitation: null,
   setSelectedCitation: (citation) => set({ selectedCitation: citation }),

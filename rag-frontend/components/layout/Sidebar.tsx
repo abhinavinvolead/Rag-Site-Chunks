@@ -25,6 +25,8 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { documents, setDocuments, isIndexed } = useChatStore()
+  const mode = useChatStore(state => state.mode)
+  const messages = useChatStore(state => state.messages)
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'documents' | 'upload'>('documents')
 
@@ -119,9 +121,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {activeTab === 'upload' ? (
+          {mode === 'rag' && activeTab === 'upload' ? (
             <PDFUploader />
-          ) : (
+          ) : mode === 'rag' ? (
             <div className="space-y-3">
               {/* Index Status */}
               <Card className={`p-3 ${isIndexed ? 'bg-green-50 dark:bg-green-950/20 border-green-200' : 'bg-orange-50 dark:bg-orange-950/20 border-orange-200'}`}>
@@ -182,6 +184,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          ) : (
+            // Groq mode: show simple conversation history in sidebar
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Conversation History</h3>
+              {messages.length === 0 ? (
+                <div className="text-sm text-gray-500">No messages yet</div>
+              ) : (
+                messages.slice().reverse().map((m) => (
+                  <Card key={m.id} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                      <strong className="mr-1">{m.role === 'user' ? 'You:' : 'Assistant:'}</strong>
+                      {m.content?.slice(0, 120)}{m.content && m.content.length > 120 ? '…' : ''}
                     </div>
                   </Card>
                 ))

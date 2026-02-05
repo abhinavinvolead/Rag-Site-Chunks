@@ -163,6 +163,66 @@ export async function chatNonStreaming(request: ChatRequest): Promise<{
   return data
 }
 
+// ==================== LLM (Groq) ====================
+export function streamLLM(request: ChatRequest, callbacks: StreamCallbacks): () => void {
+  const params = new URLSearchParams({
+    query: request.query,
+    ...(request.llm_model && { llm_model: request.llm_model }),
+    ...(request.temperature !== undefined && { temperature: request.temperature.toString() }),
+  })
+
+  const eventSource = new EventSource(
+    `${API_BASE}/api/llm/stream?${params.toString()}`
+  )
+
+  eventSource.addEventListener('token', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      callbacks.onToken(data.token)
+    } catch (e) {
+      console.error('Failed to parse token:', e)
+    }
+  })
+
+  eventSource.addEventListener('done', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      callbacks.onDone(data)
+      eventSource.close()
+    } catch (e) {
+      console.error('Failed to parse done event:', e)
+      eventSource.close()
+    }
+  })
+
+  eventSource.addEventListener('error', (event: any) => {
+    try {
+      const data = JSON.parse(event.data)
+      callbacks.onError(data.error)
+    } catch (e) {
+      callbacks.onError('Connection error')
+    }
+    eventSource.close()
+  })
+
+  eventSource.onerror = () => {
+    callbacks.onError('Connection lost')
+    eventSource.close()
+  }
+
+  return () => eventSource.close()
+}
+
+export async function llmNonStreaming(request: ChatRequest): Promise<{
+  answer: string
+  citations: any[]
+  model_used: string
+  query: string
+}> {
+  const { data } = await api.post('/api/llm', request)
+  return data
+}
+
 // ==================== Health ====================
 
 export async function healthCheck(): Promise<{ status: string; version: string }> {
